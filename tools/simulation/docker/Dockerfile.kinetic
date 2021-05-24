@@ -1,4 +1,4 @@
-FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
+FROM nvidia/cudagl:9.0-devel-ubuntu16.04
 
 # Copyright (c) 2017, NVIDIA CORPORATION. All rights reserved.
 # Full license terms provided in LICENSE.md file.
@@ -12,8 +12,10 @@ ARG TENSORRT_TAR_FILE
 
 WORKDIR ${HOME}
 
-RUN apt-get update && apt-get -y  --no-install-recommends install software-properties-common \
-    && add-apt-repository ppa:ubuntu-toolchain-r/test
+RUN apt-get update && apt-get -y  --no-install-recommends install software-properties-common
+
+# cuDNN version must match the one used by TensorRT.
+# TRT 4.0 is compiled with cuDNN 7.1.
 
 RUN apt-get update && apt-get -y --no-install-recommends install \
         ant \
@@ -29,6 +31,8 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
         iputils-ping \
         less \
         lcov \
+        libcudnn7=7.1.4.18-1+cuda9.0 \
+        libcudnn7-dev=7.1.4.18-1+cuda9.0 \
         libeigen3-dev \
         libopencv-dev \
         make \
@@ -57,7 +61,9 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     && apt-get -y autoremove \
     && apt-get clean autoclean \
     # pip
-    && pip install setuptools wheel \
+    && pip install pip --upgrade \
+    && pip install 'setuptools<4.3' wheel \
+    && pip install 'matplotlib==2.2.2' --force-reinstall \
     # coveralls code coverage reporting
     && pip install cpp-coveralls \
     # jinja template generation
@@ -65,7 +71,7 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     # cleanup
     && rm -rf /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* \
     # Add Fast-RTPS
-    && cd /opt && curl http://www.eprosima.com/index.php/component/ars/repository/eprosima-fast-rtps/eprosima-fast-rtps-1-5-0/eprosima_fastrtps-1-5-0-linux-tar-gz?format=raw | tar xz eProsima_FastRTPS-1.5.0-Linux/share/fastrtps/fastrtpsgen.jar eProsima_FastRTPS-1.5.0-Linux/bin/fastrtpsgen \
+    && cd /opt && curl https://www.eprosima.com/index.php/component/ars/repository/eprosima-fast-dds/eprosima-fast-rtps-1-5-0/eprosima_fastrtps-1-5-0-linux-tar-gz?format=raw | tar xz eProsima_FastRTPS-1.5.0-Linux/share/fastrtps/fastrtpsgen.jar eProsima_FastRTPS-1.5.0-Linux/bin/fastrtpsgen \
     && ln -s /opt/eProsima_FastRTPS-1.5.0-Linux/bin/fastrtpsgen /usr/local/bin/fastrtpsgen \
     && mkdir -p /usr/local/share/fastrtps && ln -s /opt/eProsima_FastRTPS-1.5.0-Linux/share/fastrtps/fastrtpsgen.jar /usr/local/share/fastrtps/fastrtpsgen.jar
 
@@ -108,7 +114,7 @@ RUN mkdir ./px4/ && cd ./px4/                                        \
 
 # ROS Kinetic
 WORKDIR ${HOME}
-RUN apt-key adv --keyserver hkp://ha.pool.sks-keyservers.net:80 --recv-key 421C365BD9FF1F717815A3895523BAEEB01FA116 \
+RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654 \
     && sh -c 'echo "deb http://packages.ros.org/ros/ubuntu xenial main" > /etc/apt/sources.list.d/ros-latest.list' \
     && sh -c 'echo "deb http://packages.ros.org/ros-shadow-fixed/ubuntu/ xenial main" > /etc/apt/sources.list.d/ros-shadow.list' \
     && apt-get update && apt-get -y --no-install-recommends install \
@@ -155,7 +161,8 @@ WORKDIR ${HOME}
 COPY ${TENSORRT_TAR_FILE} ${HOME}
 
 ENV TENSORRT_BASE_DIR /opt/tensorrt
-ENV TENSORRT_VER      3.0.4
+# REVIEW alexeyk: lift to a build argument.
+ENV TENSORRT_VER      4.0.1.6
 ENV TENSORRT_DIR      ${TENSORRT_BASE_DIR}/TensorRT-${TENSORRT_VER}
 
 RUN mkdir ${TENSORRT_BASE_DIR} \
